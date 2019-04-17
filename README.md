@@ -14,9 +14,9 @@ This code is used for quick analysis of vasp calculation solely from vasprun.xml
 ## Prerequisites
 To use it, one must have python 3 installed. It is recommended to install conda if one don't have root access in his computer.
 In addition, several packages will be required
-- pymatgen
-- pandans
-- lxml
+- `pymatgen`
+- `pandas`
+- `lxml`
 
 One could follow the [wikipage](https://github.com/qzhu2017/CMS/wiki/Python-environment-setup) to set up your python environment.
 ```
@@ -24,31 +24,36 @@ $ python vasprun.py -h
 ```
 ## Usage
 ```
-Usage: vasprun.py [options]
+usage: vasprun.py [-h] [-i] [-p] [-c cif file] [-k] [-d dos_plot]
+                  [-b band_plot] [-v vasprun] [-f] [-a] [-e] [-s smearing]
+                  [-n figname] [-l lim] [-m max] [-o datname] [-q]
 
-Options:
+optional arguments:
   -h, --help            show this help message and exit
   -i, --incar           export incar file
-  -p poscar file, --poscar=poscar file
-                        export poscar file
-  -c cif file, --cif=cif file
+  -p, --poscar          export poscar file
+  -c cif file, --cif cif file
                         export symmetrized cif
-  -k, --kpoints         kpoints file
-  -d dos_plot, --dosplot=dos_plot
+  -k, --kpoints         export kpoint coordinate and its weight
+  -d dos_plot, --dosplot dos_plot
                         export dos plot, options: t, spd, a, a-Si, a-1
-  -b band_plot, --bandplot=band_plot
+  -b band_plot, --bandplot band_plot
                         export band plot, options: normal or projected
-  -v vasprun, --vasprun=vasprun
+  -v vasprun, --vasprun vasprun
                         path of vasprun.xml file, default: vasprun.xml
-  -f, --showforce       show forces, default: no
+  -f, --showforce       show forces
   -a, --allparameters   show all parameters
   -e, --eigenvalues     show eigenvalues in valence/conduction band
-  -s smearing, --smear=smearing
+  -s smearing, --smear smearing
                         smearing parameter for dos plot, e.g., 0.1 A
-  -n figname, --figname=figname
+  -n figname, --figname figname
                         dos/band figure name, default: fig.png
-  -l lim, --lim=lim     dos/band plot lim, default: -3, 3
-  -m max, --max=max     band plot colorbar, default: 0.5
+  -l lim, --lim lim     dos/band plot lim, default: -3,3
+  -m max, --max max     band plot colorbar, default: 0.5
+  -o datname, --output datname
+                        p4vasp-like export data of band structure
+  -q, --quiet           In quiet mode, there will be no standar output about
+                        the system
 ```
 ## Force information
 ```
