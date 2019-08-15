@@ -19,6 +19,8 @@ from matplotlib import rcParams
 rcParams.update({'figure.autolayout': True})
 #plt.style.use("bmh")
 
+import click
+
 def smear_data(data, sigma):
     """
     Apply Gaussian smearing to spectrum y value.
@@ -30,7 +32,6 @@ def smear_data(data, sigma):
     avg_x_per_step = np.sum(diff) / len(diff)
     data[:, 1] = gaussian_filter1d(data[:, 1], sigma / avg_x_per_step)
     return data
-
 
 class vasprun:
     """
@@ -312,7 +313,7 @@ class vasprun:
             for ss in s.findall("set"):
                 t_dos.append(self.parse_varray_pymatgen(ss))
         for s in dos.find("partial").find("array").findall("set"):
-            for i, ss in enumerate(s.findall("set")):
+            for ss in s.findall("set"):
                 p = []
                 for sss in ss.findall("set"):
                     p.append(self.parse_varray_pymatgen(sss))
@@ -338,7 +339,9 @@ class vasprun:
         eigenvalues = []
         energy = 0.0
         scf_count = 0
+        # Total DOS
         tdos = []
+        # Partial DOS
         pdos = []
         # NEW ADD
         proj = []
@@ -502,18 +505,17 @@ class vasprun:
     def export_kpoints(self, filename=None):
         """export kpoints"""
         contents = ['KPOINTS\n']
-        contents += str(len(self.values['kpoints']['list'])) + '\n'
-        contents += ['Cartesian\n']
+        contents.append(str(len(self.values['kpoints']['list'])) + '\n')
+        contents.append('Cartesian\n')
         for kpt, wt in zip(self.values['kpoints']['list'], self.values['kpoints']['weights']):
-            content = "{:10.4f} {:10.4f} {:10.4f} {:10.4f}".format(kpt[0], kpt[1], kpt[2], wt[0])
-            if filename is None:
-                print(content)
-            else:
-                content += '\n'
-                contents.append(str(content))
+            k_str = "{:10.4f} {:10.4f} {:10.4f} {:10.4f}\n".format(kpt[0], kpt[1], kpt[2], wt[0])
+            contents.append(k_str)
         if filename is not None:
             with open(filename, 'w') as f:
                 f.writelines(contents)
+        else:
+            for content in contents:
+                print(content[:-1])
 
     def export_structure(self, filename='POSCAR_AUTOGEN', fileformat='poscar'):
         """export incar"""
@@ -638,12 +640,12 @@ class vasprun:
                 labels.append(style)
 
         elif style[0] == 'a':
-            if style[1].isdigit():
-                ids = style[1].split('-')
+            if style[2].isdigit():
+                ids = style[2].split('-')
                 start, end = int(ids[0]), int(ids[1]) 
                 ids = range(start, end+1)
             else: 
-                ele = style[1:]
+                ele = style[2:]
                 ids = []
                 for i in range(N_atom):
                     if ele == a_array[i]:
@@ -714,8 +716,8 @@ class vasprun:
 
     def export_dat(self, filename='vasp_band.dat'):
         with open(filename, 'w') as f:
-            kk = test.values['band_paths']
-            EE = np.array(test.values['calculation']['eigenvalues'])[:,:,0]
+            kk = self.values['band_paths']
+            EE = np.array(self.values['calculation']['eigenvalues'])[:,:,0]
             nkp, nband = EE.shape
             for i in range(nband):
                 for j in range(nkp):
@@ -725,50 +727,49 @@ class vasprun:
                     f.write(line)
                 f.write('\n')
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    # set action to be 'store_true', so there is no need of metavar
-    parser.add_argument("-i", "--incar", dest="incar", action='store_true',
-                        help="export incar file")
-    parser.add_argument("-p", "--poscar", dest="poscar", action='store_true',
-                        help="export poscar file")
-    parser.add_argument("-c", "--cif", dest="cif", metavar="cif file",
-                        help="export symmetrized cif")
-    parser.add_argument("-k", "--kpoints", dest="kpoints", action='store_true',
-                        help="export kpoint coordinate and its weight")
-    parser.add_argument("-d", "--dosplot", dest="dosplot", metavar="dos_plot", type=str,
-                        help="export dos plot, options: t, spd, a, a-Si, a-1")
-    parser.add_argument("-b", "--bandplot", dest="bandplot", metavar="band_plot", default='normal', type=str,
-                        help="export band plot, options: normal or projected")
-    parser.add_argument("-v", "--vasprun", dest="vasprun", default='vasprun.xml',
-                        help="path of vasprun.xml file, default: vasprun.xml", metavar="vasprun")
-    parser.add_argument("-f", "--showforce", dest="force", action='store_true',
-                        help="show forces")
-    parser.add_argument("-a", "--allparameters", dest="parameters", action='store_true',
-                        help="show all parameters")
-    parser.add_argument("-e", "--eigenvalues", dest="band", action='store_true',
-                        help="show eigenvalues in valence/conduction band")
-    parser.add_argument("-s", "--smear", dest="smear", type=float,
-                        help="smearing parameter for dos plot, e.g., 0.1 A", metavar="smearing")
-    parser.add_argument("-n", "--figname", dest="figname", type=str, default='fig.png',
-                        help="dos/band figure name, default: fig.png", metavar="figname")
-    parser.add_argument("-l", "--lim", dest="lim", default='-3,3', 
-                        help="dos/band plot lim, default: -3,3", metavar="lim")
-    parser.add_argument("-m", "--max", dest="max", default=0.5, type=float,
-                        help="band plot colorbar, default: 0.5", metavar="max")
-    parser.add_argument("-o", "--output", dest="datname", type=str,
-                        help="p4vasp-like export data of band structure", metavar="datname")
-    parser.add_argument("-q", "--quiet", dest="quiet", action='store_true',
-                        help="In quiet mode, there will be no standar output about the system")
-    
-    args = parser.parse_args()
+@click.command()
+@click.option("-i", "--incar", is_flag=True, help="export incar file")
+@click.option("-p", "--poscar", is_flag=True, help="export poscar file")
+@click.option("-c", "--cif", type=str, help="export symmetrized cif")
+@click.option("-k", "--kpoints", is_flag=True, help="export kpoint coordinate and its weight")
+@click.option("-d", "--dosplot", type=str, help="export dos plot, options: t, spd, a, a-Si, a-1")
+@click.option("-b", "--bandplot", type=str, help="export band plot, options: normal or projected")
+@click.option("-v", "--vaspxml", default='vasprun.xml', help="path of vasprun.xml file, default: vasprun.xml" )
+@click.option("-f", "--showforce", "force", is_flag=True, help="show forces")
+@click.option("-a", "--allparameters", "parameters", is_flag=True, help="show all parameters")
+@click.option("-e", "--eigenvalues", "band", is_flag=True, help="show eigenvalues in valence/conduction band")
+@click.option("-s", "--smear", type=float, help="smearing parameter for dos plot, e.g., 0.1 A" )
+@click.option("-n", "--figname",type=str, help="dos/band figure name, default: fig.png" )
+@click.option("-l", "--lim", nargs=2, default=(-3,3),  help="dos/band plot lim, default: -3,3" )
+@click.option("-m", "--plotmax", default=0.5, type=float, help="band plot colorbar, default: 0.5" )
+@click.option("-o", "--datname", type=str, help="p4vasp-like export data of band structure" )
+@click.option("-q", "--quiet", is_flag=True, help="In quiet mode, there will be no standard output about the system")
+def main_func(incar, poscar, cif, kpoints, dosplot, bandplot, vaspxml, force, parameters, band, smear, figname, lim, plotmax, datname, quiet):
+    click.echo()
+    # Test command line parameters
+    click.echo('incar		: {}'.format(incar))
+    click.echo('poscar		: {}'.format(poscar))
+    click.echo('cif		    : {}'.format(cif))
+    click.echo('kpoints		: {}'.format(kpoints))
+    click.echo('dosplot		: {}'.format(dosplot))
+    click.echo('bandplot	: {}'.format(bandplot))
+    click.echo('vaspxml		: {}'.format(vaspxml))
+    click.echo('force		: {}'.format(force))
+    click.echo('parameters	: {}'.format(parameters))
+    click.echo('band		: {}'.format(band))
+    click.echo('smear		: {}'.format(smear))
+    click.echo('figname		: {}'.format(figname))
+    click.echo('lim		    : {}'.format(lim))
+    click.echo('plotmax		: {}'.format(plotmax))
+    click.echo('datname		: {}'.format(datname))
+    click.echo('quiet		: {}'.format(quiet))
 
-    test = vasprun(args.vasprun)
+    test = vasprun(vaspxml)
 
     # standard output, not be printed in quiet mode
-    if not args.quiet:
+    if not quiet:
         if test.values['parameters']['ionic']['NSW'] <= 1:
-            print('This is a single point calculation')
+            click.echo('This is a single point calculation.\n')
         # pprint(test.values['kpoints'])
 
         output = {'formula': None,
@@ -777,10 +778,10 @@ if __name__ == "__main__":
                 'gap': None}
         for tag in output.keys():
             if output[tag] is None:
-                print(tag, ':  ', test.values[tag])
+                click.echo('{0:16}: {1}'.format(tag, test.values[tag]))
             else:
                 for subtag in output[tag]:
-                    print(subtag, ':  ', test.values[tag][subtag])
+                    click.echo('{0:16}: {1}'.format(subtag, test.values[tag][subtag]))
 
         # show VBM and CBM when it is nonmetal
         if test.values['metal'] is False:
@@ -788,50 +789,56 @@ if __name__ == "__main__":
                         'kpoint': [test.values['cbm']['kpoint'], test.values['vbm']['kpoint']],
                         'values': [test.values['cbm']['value'], test.values['vbm']['value']]}
             df = pd.DataFrame(col_name)
-            print(tabulate(df, headers='keys', tablefmt='psql'))
+            click.echo(tabulate(df, headers='keys', tablefmt='psql'))
 
         col_name = {'valence': test.values['valence'],
                     'labels': test.values['pseudo_potential']['labels'],
                     'functional': test.values['pseudo_potential']['functional']}
         df = pd.DataFrame(col_name)
-        print(tabulate(df, headers='keys', tablefmt='psql'))
+        click.echo()
+        click.echo(tabulate(df, headers='keys', tablefmt='psql'))
 
-    if args.force:
+
+    if force:
         col_name = {'lattice': test.values['finalpos']['basis'],
                     'stress (kbar)': test.values['calculation']['stress']}
         df = pd.DataFrame(col_name)
-        print(tabulate(df, headers='keys', tablefmt='psql'))
+        click.echo()
+        click.echo(tabulate(df, headers='keys', tablefmt='psql'))
         col_name = {'atom': test.values['finalpos']['positions'],
                     'force (eV/A)': test.values['calculation']['force']}
         df = pd.DataFrame(col_name)
-        print(tabulate(df, headers='keys', tablefmt='psql'))
+        click.echo()
+        click.echo(tabulate(df, headers='keys', tablefmt='psql'))
     
-    if args.datname is not None:
-        print("\n\tReady to output. Please wait...\n")
+    if datname:
+        click.echo("\n\tReady to output. Please wait...\n")
         test.parse_bandpath()
-        test.export_dat(filename=args.datname)
-        print("\n\tCompleting Output of the data file.\n")
+        test.export_dat(filename=datname)
+        click.echo("\n\tCompleting Output of the data file.\n")
 
-    if args.incar:
+    if incar:
         test.export_incar()
-    elif args.kpoints:
+    elif kpoints:
         test.export_kpoints()
-    elif args.poscar:
+    elif poscar:
         test.export_structure()
-    elif args.cif:
-        test.export_structure(filename=args.cif, fileformat='cif')
-    elif args.parameters:
+        click.echo("\tCompleting Output. Please see 'POSCAR_AUTOGEN' in your folder.\n")
+    elif cif:
+        test.export_structure(filename=cif, fileformat='cif')
+    elif parameters:
+        click.echo()
         pprint(test.values['parameters'])
-    elif args.dosplot:
-        lim = args.lim.split(',')
-        lim = [float(i) for i in lim]
-        test.plot_dos(styles=args.dosplot, filename=args.figname, xlim=lim, smear=args.smear)
-    elif args.bandplot:
-        lim = args.lim.split(',')
-        lim = [float(i) for i in lim]
+    elif dosplot:
+        # lim = lim.split(',')
+        # lim = [float(i) for i in lim]
+        test.plot_dos(styles=dosplot, filename=figname, xlim=lim, smear=smear)
+    elif bandplot:
+        # lim = lim.split(',')
+        # lim = [float(i) for i in lim]
         test.parse_bandpath()
-        test.plot_band(styles=args.bandplot, filename=args.figname, ylim=lim, p_max=args.max)
-    elif args.band:
+        test.plot_band(styles=bandplot, filename=figname, ylim=lim, p_max=plotmax)
+    elif band:
         vb = test.values['bands']-1
         cb = vb + 1
         test.show_eigenvalues_by_band([vb, cb])
@@ -839,11 +846,34 @@ if __name__ == "__main__":
         vbs = test.eigenvalues_by_band(vb)
         ID = np.argmin(cbs-vbs)
         if len(cbs) == len(test.values['kpoints']['list']):
-            print("Eigenvalue at CBM: ", min(cbs))
-            print("Eigenvalue at VBM: ", max(vbs))
-            print("minimum gap at : ", test.values['kpoints']['list'][ID])
-            print("CB: ", cbs[ID])
-            print("VB: ", vbs[ID])
-            print("diff: ", cbs[ID]-vbs[ID])
+            click.echo()
+            click.echo("Eigenvalue at CBM : ", min(cbs))
+            click.echo("Eigenvalue at VBM : ", max(vbs))
+            click.echo("minimum gap at    : ", test.values['kpoints']['list'][ID])
+            click.echo("CB                : ", cbs[ID])
+            click.echo("VB                : ", vbs[ID])
+            click.echo("diff              : ", cbs[ID]-vbs[ID])
         else:
-            print("This is spin calculation")
+            click.echo("This is spin calculation.")
+
+if __name__ == "__main__":
+    main_func()
+
+    # Test
+    # incar	    = False
+    # poscar	    = False
+    # cif		    = None
+    # kpoints		= False
+    # dosplot		= 'a-1'
+    # bandplot  	= None
+    # vaspxml		= 'vasprun.xml'
+    # force		= False
+    # parameters	= False
+    # band		= False
+    # smear		= None
+    # figname		= 'dos-test.png'
+    # lim	    	= [-4, 4]
+    # plotmax		= 0.5
+    # datname		= None
+    # quiet       = True
+    # main_func(incar, poscar, cif, kpoints, dosplot, bandplot, vaspxml, force, parameters, band, smear, figname, lim, plotmax, datname, quiet)

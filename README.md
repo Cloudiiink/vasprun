@@ -6,7 +6,7 @@ This code is used for quick analysis of vasp calculation solely from vasprun.xml
 - band structure plot (with color map enhancement)
 - incar/potcar/poscar generation
 - force analysys
-- KS orbital eigenvalue analysys
+- KS orbital eigenvalue analysis
 - dynamical matrix (to add)
 - elastic constants (to add)
 - dielectric constants (to add)
@@ -109,6 +109,7 @@ It will geneate a dos-spd.png figure as follows:
 ![dos.png](https://github.com/qzhu2017/vasprun/blob/master/images/dos.png)
 
 ## Band plots
+
 ```
 $ python vasprun.py -v vasprun.xml-band -b normal -l -3,3 -m 0.4 -n band.png
 ```
