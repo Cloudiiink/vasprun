@@ -471,7 +471,7 @@ class vasprun:
         eigens = np.array(self.values['calculation']['eigenvalues'])
         return eigens[:, band, 0] - efermi
 
-    def show_eigenvalues_by_band(self, bands=[0], spin=True):
+    def show_eigenvalues_by_band(self, bands=[0], spin=False):
         kpts = self.values['kpoints']['list']
         col_name = {'K-points': kpts}
         for i, band in enumerate(bands):
@@ -620,11 +620,12 @@ class vasprun:
         pdos = np.array(self.values['calculation']['pdos'])
         a, b, c, d = np.shape(pdos)
         pdos = np.reshape(pdos, [b, a, c, d])
+        # Get Total DOS
         if style == 't':
             for spin in tdos:
                 mydos.append(spin[rows, 1])
                 labels.append('total')
-
+        # Get partial DOS of all atoms
         elif style in ['s', 'p', 'd']:
             for spin in pdos:
                 spd = spin[0, : , :]
@@ -635,28 +636,52 @@ class vasprun:
                     mydos.append(spd[rows, 1])
                 elif style == 'p':
                     mydos.append(spd[rows, 2] + spd[rows, 3] + spd[rows, 4])
-                else:
+                elif style == 'd':
                     mydos.append(spd[rows, 5] + spd[rows, 6] + spd[rows, 7] + spd[rows, 8] + spd[rows, 9])
+                else:
+                    raise ValueError('Only support spd, but the input is {}'.format(style))
+                
                 labels.append(style)
-
-        elif style[0] == 'a':
-            if style[2].isdigit():
-                ids = style[2].split('-')
-                start, end = int(ids[0]), int(ids[1]) 
-                ids = range(start, end+1)
-            else: 
-                ele = style[2:]
+        # Get partial DOS of different elements or different atoms
+        elif ':' in style:
+            eles, state = style.split(':')
+            if eles[0].isdigit():
+                # Get element number from string such as '1, 2, 3-6'
+                ids = []
+                # Seperate element groups by ','
+                if ',' in eles:
+                    eles = eles.split(',')
+                else:
+                    eles = [eles]
+                for ele in eles:
+                    if '-' in ele:
+                        ele = ele.split('-')
+                        start, end = int(ele[0]), int(ele[1])
+                        ids += list(range(start, end+1))
+                    else:
+                        ids.append(int(ele))
+            else:
+                # Get element number from element name such as 'W', 'C'
                 ids = []
                 for i in range(N_atom):
-                    if ele == a_array[i]:
+                    if eles == a_array[i]:
                         ids.append(i)
+            # Get DOS data
             for spin in pdos:
                 spd = spin[ids[0], :, :]
                 for i in ids[1:]:
-                    spd += spin[i, :, :] 
-                mydos.append(spd[rows, 1] + spd[rows, 2] + spd[rows, 3] + spd[rows, 4] + \
-                             spd[rows, 5] + spd[rows, 6] + spd[rows, 7] + spd[rows, 8] + spd[rows, 9])
-                labels.append(style[1:])
+                    spd += spin[i, :, :]
+                
+                if state == 's':
+                    mydos.append(spd[rows, 1])
+                elif state == 'p':
+                    mydos.append(spd[rows, 2] + spd[rows, 3] + spd[rows, 4])
+                elif state == 'd':
+                    mydos.append(spd[rows, 5] + spd[rows, 6] + spd[rows, 7] + spd[rows, 8] + spd[rows, 9])
+                else:
+                    raise ValueError('Only support s, p, d, but the input is {}'.format(style))
+
+                labels.append(style)
 
         if len(labels) == 2:
             labels[0] += '-up'
@@ -664,7 +689,7 @@ class vasprun:
             mydos[1] *= -1
         return mydos, labels
 
-    def plot_dos(self, filename='dos.png', smear=None, styles='t', xlim=[-3, 3]):
+    def plot_dos(self, filename='dos.png', smear=None, styles=['t'], xlim=[-3, 3]):
         """export dos"""
         efermi = self.values['calculation']['efermi']
         tdos = np.array(self.values['calculation']['tdos'][0])
@@ -673,11 +698,20 @@ class vasprun:
         rows = (e > xlim[0]) & (e < xlim[1])
         e = e[rows]
         plt_obj = {}
-        for option in styles.split('+'):
-            if option == 'spd':
-                option = ['s', 'p', 'd']
+        for option in styles:
+            # Seperate partial dos notation
+            if ':' not in option:
+                option = list(option)
+            # Seperate partial dos notation with given atoms or elements
             else:
-                option = [option]
+                ele, par = option.split(':')
+                # atom, begin with number
+                if ele[0].isdigit():
+                    option = [ele + ':' + p for p in list(par)]
+                # element
+                else:
+                    option = [e + ':' + p for e in ele.split(',') for p in list(par)]
+
             for style in option:
                 mydos, labels = self.get_dos(rows, style)
                 for data, label in zip(mydos, labels):
@@ -714,6 +748,52 @@ class vasprun:
         plt.xlim(xlim)
         plt.savefig(filename)
 
+    def export_dos(self, filename='dos.dat', styles=['t'], xlim=[-3, 3], smear=None):
+        """export dos dat file"""
+        efermi = self.values['calculation']['efermi']
+        tdos = np.array(self.values['calculation']['tdos'][0])
+        tdos[:, 0] -= efermi
+        e = tdos[:, 0]
+        rows = (e > xlim[0]) & (e < xlim[1])
+        e = e[rows]
+        plt_obj = {}
+        for option in styles:
+            # Seperate partial dos notation
+            if ':' not in option:
+                option = list(option)
+            # Seperate partial dos notation with given atoms or elements
+            else:
+                ele, par = option.split(':')
+                # atom, begin with number
+                if ele[0].isdigit():
+                    option = [ele + ':' + p for p in list(par)]
+                # element
+                else:
+                    option = [e + ':' + p for e in ele.split(',') for p in list(par)]
+
+            for style in option:
+                mydos, labels = self.get_dos(rows, style)
+                for data, label in zip(mydos, labels):
+                    plt_obj[label] = data
+
+        # Store data
+        result = pd.DataFrame()
+        result['E'] = e
+        e = np.reshape(e, [len(e), 1])
+        # Process procedure is the same as plot_dos function
+        for label in plt_obj.keys():
+            data = np.reshape(plt_obj[label], [len(e), 1])
+            if smear is not None: 
+                data = np.hstack((e, data))
+                data = smear_data(data, smear)
+                data = data[:, 1]
+                result[label] = data
+            else:
+                result[label] = data
+        
+        # Export data
+        result.to_csv(filename, header=True, index=False, sep='\t', mode='a')
+
     def export_dat(self, filename='vasp_band.dat'):
         with open(filename, 'w') as f:
             kk = self.values['band_paths']
@@ -732,37 +812,39 @@ class vasprun:
 @click.option("-p", "--poscar", is_flag=True, help="export poscar file")
 @click.option("-c", "--cif", type=str, help="export symmetrized cif")
 @click.option("-k", "--kpoints", is_flag=True, help="export kpoint coordinate and its weight")
-@click.option("-d", "--dosplot", type=str, help="export dos plot, options: t, spd, a, a-Si, a-1")
+@click.option("-d", "--dosplot", multiple=True, help="export dos plot, options: t, spd, t+spd, C:p etc")
 @click.option("-b", "--bandplot", type=str, help="export band plot, options: normal or projected")
-@click.option("-v", "--vaspxml", default='vasprun.xml', help="path of vasprun.xml file, default: vasprun.xml" )
+@click.option("-v", "--vaspxml", default='vasprun.xml', help="path of vasprun.xml file, default: vasprun.xml")
 @click.option("-f", "--showforce", "force", is_flag=True, help="show forces")
 @click.option("-a", "--allparameters", "parameters", is_flag=True, help="show all parameters")
-@click.option("-e", "--eigenvalues", "band", is_flag=True, help="show eigenvalues in valence/conduction band")
-@click.option("-s", "--smear", type=float, help="smearing parameter for dos plot, e.g., 0.1 A" )
-@click.option("-n", "--figname",type=str, help="dos/band figure name, default: fig.png" )
-@click.option("-l", "--lim", nargs=2, default=(-3,3),  help="dos/band plot lim, default: -3,3" )
-@click.option("-m", "--plotmax", default=0.5, type=float, help="band plot colorbar, default: 0.5" )
-@click.option("-o", "--datname", type=str, help="p4vasp-like export data of band structure" )
+@click.option("-e", "--eigenvalues", is_flag=True, help="show eigenvalues in valence/conduction band")
+@click.option("-s", "--smear", type=float, help="smearing parameter for dos plot, e.g., 0.1 A")
+@click.option("-n", "--filename",type=str, help="dos/band figure/data file name, default: fig.png")
+@click.option("-l", "--lim", nargs=2, default=(-3,3),  help="dos/band plot lim, default: -3,3")
+@click.option("-m", "--plotmax", default=0.5, type=float, help="band plot colorbar, default: 0.5")
+@click.option("-B", "--bandexport", is_flag=True, help="p4vasp-like export data of band structure")
+@click.option("-D", "--dosexport", is_flag=True, help="Export data of partial DOS")
 @click.option("-q", "--quiet", is_flag=True, help="In quiet mode, there will be no standard output about the system")
-def main_func(incar, poscar, cif, kpoints, dosplot, bandplot, vaspxml, force, parameters, band, smear, figname, lim, plotmax, datname, quiet):
+def main_func(incar, poscar, cif, kpoints, dosplot, bandplot, vaspxml, force, parameters, eigenvalues, smear, filename, lim, plotmax, bandexport, dosexport, quiet):
     click.echo()
     # Test command line parameters
-    click.echo('incar		: {}'.format(incar))
-    click.echo('poscar		: {}'.format(poscar))
-    click.echo('cif		    : {}'.format(cif))
-    click.echo('kpoints		: {}'.format(kpoints))
-    click.echo('dosplot		: {}'.format(dosplot))
-    click.echo('bandplot	: {}'.format(bandplot))
-    click.echo('vaspxml		: {}'.format(vaspxml))
-    click.echo('force		: {}'.format(force))
-    click.echo('parameters	: {}'.format(parameters))
-    click.echo('band		: {}'.format(band))
-    click.echo('smear		: {}'.format(smear))
-    click.echo('figname		: {}'.format(figname))
-    click.echo('lim		    : {}'.format(lim))
-    click.echo('plotmax		: {}'.format(plotmax))
-    click.echo('datname		: {}'.format(datname))
-    click.echo('quiet		: {}'.format(quiet))
+    # click.echo('incar		: {}'.format(incar))
+    # click.echo('poscar		: {}'.format(poscar))
+    # click.echo('cif		    : {}'.format(cif))
+    # click.echo('kpoints		: {}'.format(kpoints))
+    # click.echo('dosplot		: {}'.format(dosplot))
+    # click.echo('bandplot	: {}'.format(bandplot))
+    # click.echo('vaspxml		: {}'.format(vaspxml))
+    # click.echo('force		: {}'.format(force))
+    # click.echo('parameters	: {}'.format(parameters))
+    # click.echo('eigenvalues	: {}'.format(eigenvalues))
+    # click.echo('smear		: {}'.format(smear))
+    # click.echo('filename	: {}'.format(filename))
+    # click.echo('lim		    : {}'.format(lim))
+    # click.echo('plotmax		: {}'.format(plotmax))
+    # click.echo('bandexport  : {}'.format(bandexport))
+    # click.echo('dosexport   : {}'.format(dosexport))
+    # click.echo('quiet		: {}'.format(quiet))
 
     test = vasprun(vaspxml)
 
@@ -798,7 +880,6 @@ def main_func(incar, poscar, cif, kpoints, dosplot, bandplot, vaspxml, force, pa
         click.echo()
         click.echo(tabulate(df, headers='keys', tablefmt='psql'))
 
-
     if force:
         col_name = {'lattice': test.values['finalpos']['basis'],
                     'stress (kbar)': test.values['calculation']['stress']}
@@ -811,12 +892,6 @@ def main_func(incar, poscar, cif, kpoints, dosplot, bandplot, vaspxml, force, pa
         click.echo()
         click.echo(tabulate(df, headers='keys', tablefmt='psql'))
     
-    if datname:
-        click.echo("\n\tReady to output. Please wait...\n")
-        test.parse_bandpath()
-        test.export_dat(filename=datname)
-        click.echo("\n\tCompleting Output of the data file.\n")
-
     if incar:
         test.export_incar()
     elif kpoints:
@@ -830,15 +905,24 @@ def main_func(incar, poscar, cif, kpoints, dosplot, bandplot, vaspxml, force, pa
         click.echo()
         pprint(test.values['parameters'])
     elif dosplot:
-        # lim = lim.split(',')
-        # lim = [float(i) for i in lim]
-        test.plot_dos(styles=dosplot, filename=figname, xlim=lim, smear=smear)
+        # Allow users use '+' to link different options
+        styles = []
+        for style in dosplot:
+            if '+' in style:
+                styles += style.split('+')
+            else:
+                styles.append(style)
+        if dosexport:
+            test.export_dos(styles=styles, filename=filename, xlim=lim, smear=smear)
+        else:
+            test.plot_dos(styles=styles, filename=filename, xlim=lim, smear=smear)
     elif bandplot:
-        # lim = lim.split(',')
-        # lim = [float(i) for i in lim]
         test.parse_bandpath()
-        test.plot_band(styles=bandplot, filename=figname, ylim=lim, p_max=plotmax)
-    elif band:
+        test.plot_band(styles=bandplot, filename=filename, ylim=lim, p_max=plotmax)
+    elif bandexport:
+        test.parse_bandpath()
+        test.export_dat(filename=filename)
+    elif eigenvalues:
         vb = test.values['bands']-1
         cb = vb + 1
         test.show_eigenvalues_by_band([vb, cb])
@@ -847,12 +931,12 @@ def main_func(incar, poscar, cif, kpoints, dosplot, bandplot, vaspxml, force, pa
         ID = np.argmin(cbs-vbs)
         if len(cbs) == len(test.values['kpoints']['list']):
             click.echo()
-            click.echo("Eigenvalue at CBM : ", min(cbs))
-            click.echo("Eigenvalue at VBM : ", max(vbs))
-            click.echo("minimum gap at    : ", test.values['kpoints']['list'][ID])
-            click.echo("CB                : ", cbs[ID])
-            click.echo("VB                : ", vbs[ID])
-            click.echo("diff              : ", cbs[ID]-vbs[ID])
+            click.echo("Eigenvalue at CBM : {0}".format(min(cbs)))
+            click.echo("Eigenvalue at VBM : {0}".format(max(vbs)))
+            click.echo("minimum gap at    : {0}".format(test.values['kpoints']['list'][ID]))
+            click.echo("CB                : {0}".format(cbs[ID]))
+            click.echo("VB                : {0}".format(vbs[ID]))
+            click.echo("diff              : {0}".format(cbs[ID]-vbs[ID]))
         else:
             click.echo("This is spin calculation.")
 
@@ -864,16 +948,15 @@ if __name__ == "__main__":
     # poscar	    = False
     # cif		    = None
     # kpoints		= False
-    # dosplot		= 'a-1'
+    # dosplot		= ()
     # bandplot  	= None
-    # vaspxml		= 'vasprun.xml'
+    # vaspxml		= 'vasprun_band.xml'
     # force		= False
     # parameters	= False
-    # band		= False
+    # eigenvalues	= True
     # smear		= None
-    # figname		= 'dos-test.png'
-    # lim	    	= [-4, 4]
+    # filename		= None
+    # lim	    	= (-3, 3)
     # plotmax		= 0.5
-    # datname		= None
-    # quiet       = True
-    # main_func(incar, poscar, cif, kpoints, dosplot, bandplot, vaspxml, force, parameters, band, smear, figname, lim, plotmax, datname, quiet)
+    # quiet       = False
+    # main_func(incar, poscar, cif, kpoints, dosplot, bandplot, vaspxml, force, parameters, eigenvalues, smear, filename, lim, plotmax, datname, quiet)
