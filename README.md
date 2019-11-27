@@ -111,14 +111,14 @@ It will geneate a dos-spd.png figure as follows:
 ## Band plots
 
 ```
-$ python vasprun.py -v vasprun.xml-band -b normal -l -3,3 -m 0.4 -n band.png
+$ python vasprun.py -v vasprun.xml-band -b normal -l -3 3 -m 0.4 -n band.png
 ```
 It will generate a band.png figure as the follows
 ![band.png](https://github.com/qzhu2017/vasprun/blob/master/images/band.png)
 
 Alternatively, one can generated the colored band based on the occupation of `projected DOS`.
 ```
-$ python vasprun.py -v vasprun.xml-band -b -l -3,3 -m 0.4 -n band-projected.png
+$ python vasprun.py -v vasprun.xml-band -b -l -3 3 -m 0.4 -n band-projected.png
 ```
 ![band-projected.png](https://github.com/qzhu2017/vasprun/blob/master/images/band-projected.png)
 

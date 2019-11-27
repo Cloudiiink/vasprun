@@ -820,7 +820,7 @@ class vasprun:
 @click.option("-e", "--eigenvalues", is_flag=True, help="show eigenvalues in valence/conduction band")
 @click.option("-s", "--smear", type=float, help="smearing parameter for dos plot, e.g., 0.1 A")
 @click.option("-n", "--filename",type=str, help="dos/band figure/data file name, default: fig.png")
-@click.option("-l", "--lim", nargs=2, default=(-3,3),  help="dos/band plot lim, default: -3,3")
+@click.option("-l", "--lim", nargs=2, default=(-3,3),  help="dos/band plot lim, default: -3 3")
 @click.option("-m", "--plotmax", default=0.5, type=float, help="band plot colorbar, default: 0.5")
 @click.option("-B", "--bandexport", is_flag=True, help="p4vasp-like export data of band structure")
 @click.option("-D", "--dosexport", is_flag=True, help="Export data of partial DOS")
