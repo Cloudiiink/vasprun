@@ -46,14 +46,14 @@ optional arguments:
   -e, --eigenvalues     show eigenvalues in valence/conduction band
   -s smearing, --smear smearing
                         smearing parameter for dos plot, e.g., 0.1 A
-  -n figname, --figname figname
-                        dos/band figure name, default: fig.png
-  -l lim, --lim lim     dos/band plot lim, default: -3,3
-  -m max, --max max     band plot colorbar, default: 0.5
-  -o datname, --output datname
-                        p4vasp-like export data of band structure
-  -q, --quiet           In quiet mode, there will be no standar output about
-                        the system
+  -n, --filename TEXT   dos/band figure/data file name, default:  fig.png
+
+  -l, --lim <INT INT>   dos/band plot lim, default: -3 3
+  -m, --plotmax FLOAT   band plot colorbar, default: 0.5
+  -B, --bandexport      p4vasp-like export data of band structure
+  -D, --dosexport       Export data of partial DOS
+  -q, --quiet           In quiet mode, there will be no standard
+                        output about the system
 ```
 ## Force information
 ```
@@ -121,5 +121,13 @@ Alternatively, one can generated the colored band based on the occupation of `pr
 $ python vasprun.py -v vasprun.xml-band -b -l -3 3 -m 0.4 -n band-projected.png
 ```
 ![band-projected.png](https://github.com/qzhu2017/vasprun/blob/master/images/band-projected.png)
+
+## Band Export
+
+Convert the `vasprun.xml` into readable k-E data. Default output is the k vector and coorespondent eigenvalue.
+
+```
+[0.0, 0.0, 0.0] -6.1975
+```
 
 

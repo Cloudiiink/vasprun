@@ -676,8 +676,16 @@ class vasprun:
                     mydos.append(spd[rows, 1])
                 elif state == 'p':
                     mydos.append(spd[rows, 2] + spd[rows, 3] + spd[rows, 4])
+                elif state == 'px':
+                    mydos.append(spd[rows, 2])
+                elif state == 'py':
+                    mydos.append(spd[rows, 3])
+                elif state == 'pz':
+                    mydos.append(spd[rows, 4])
                 elif state == 'd':
                     mydos.append(spd[rows, 5] + spd[rows, 6] + spd[rows, 7] + spd[rows, 8] + spd[rows, 9])
+                elif state == 'dx2':
+                    mydos.append(spd[rows, 5])
                 else:
                     raise ValueError('Only support s, p, d, but the input is {}'.format(style))
 
@@ -796,14 +804,20 @@ class vasprun:
 
     def export_dat(self, filename='vasp_band.dat'):
         with open(filename, 'w') as f:
-            kk = self.values['band_paths']
+            # kk = self.values['band_paths']
+            kk = self.values['kpoints']['list']
             EE = np.array(self.values['calculation']['eigenvalues'])[:,:,0]
+            # 打印 kk 的大小
+            # print(kk.shape)
             nkp, nband = EE.shape
+            # print(nkp)
             for i in range(nband):
                 for j in range(nkp):
                     k = kk[j]
+                    # print(k)
                     E = EE[j, i]
-                    line = f'{k:12f} {E:12f}\n'
+                    line = f'{k} {E}\n'
+                    # line = f'{k:12f} {E:12f}\n'
                     f.write(line)
                 f.write('\n')
 
